@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { Plus, Edit, Trash2, Users, Building, Phone, Mail } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -10,22 +10,12 @@ const AuthorityManagement = () => {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingAuthority, setEditingAuthority] = useState(null);
+  const [customLevel, setCustomLevel] = useState('');
   const [formData, setFormData] = useState({
-    name: '',
-    level: 'MP',
-    designation: '',
-    department: '',
-    email: '',
-    phone: '',
-    jurisdiction: {
-      area: '',
-      ward: '',
-      district: '',
-      state: '',
-      constituency: ''
-    },
-    categories: [],
-    notes: ''
+    level: '',
+    categoryId: '',
+    subcategoryId: '',
+    description: ''
   });
 
   // Fetch authorities
@@ -33,25 +23,40 @@ const AuthorityManagement = () => {
     'authorities-admin',
     () => authoritiesAPI.getAuthorities({ isActive: true }),
     {
-      select: (response) => response.data
+      select: (response) => response.data?.data || []
     }
   );
 
-  // Fetch categories
+  // Fetch categories (with subcategories)
   const { data: categories, isLoading: categoriesLoading } = useQuery(
     'categories',
     () => categoriesAPI.getCategories(),
-    {
-      select: (response) => response.data
-    }
+    { select: (response) => response.data }
   );
+
+  // Derived authority levels based on selected category/subcategory
+  const dynamicAuthorityLevels = useMemo(() => {
+    if (!categories || !formData.categoryId) return [];
+    const category = categories.find(c => c.id === formData.categoryId);
+    if (!category) return [];
+    if (formData.subcategoryId) {
+      const sub = category.Subcategories?.find(sc => sc.id === formData.subcategoryId);
+      return (sub?.authorityTypes || []).filter(Boolean);
+    }
+    // No subcategory: union of all subcategory authorityTypes
+    const set = new Set();
+    (category.Subcategories || []).forEach(sc => {
+      (sc.authorityTypes || []).forEach(t => t && set.add(t));
+    });
+    return Array.from(set);
+  }, [categories, formData.categoryId, formData.subcategoryId]);
 
   // Create authority mutation
   const createAuthorityMutation = useMutation(
     (data) => authoritiesAPI.createAuthority(data),
     {
       onSuccess: () => {
-        queryClient.invalidateQueries('authorities');
+        queryClient.invalidateQueries('authorities-admin');
         toast.success('Authority created successfully!');
         setShowForm(false);
         resetForm();
@@ -67,7 +72,7 @@ const AuthorityManagement = () => {
     ({ id, data }) => authoritiesAPI.updateAuthority(id, data),
     {
       onSuccess: () => {
-        queryClient.invalidateQueries('authorities');
+        queryClient.invalidateQueries('authorities-admin');
         toast.success('Authority updated successfully!');
         setShowForm(false);
         setEditingAuthority(null);
@@ -84,7 +89,7 @@ const AuthorityManagement = () => {
     (id) => authoritiesAPI.deleteAuthority(id),
     {
       onSuccess: () => {
-        queryClient.invalidateQueries('authorities');
+        queryClient.invalidateQueries('authorities-admin');
         toast.success('Authority deleted successfully!');
       },
       onError: (error) => {
@@ -95,56 +100,44 @@ const AuthorityManagement = () => {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      level: 'MP',
-      designation: '',
-      department: '',
-      email: '',
-      phone: '',
-      jurisdiction: {
-        area: '',
-        ward: '',
-        district: '',
-        state: '',
-        constituency: ''
-      },
-      categories: [],
-      notes: ''
+      level: '',
+      categoryId: '',
+      subcategoryId: '',
+      description: ''
     });
+    setCustomLevel('');
   };
 
   const handleEdit = (authority) => {
     setEditingAuthority(authority);
+    setCustomLevel('');
     setFormData({
-      name: authority.name,
       level: authority.level,
-      designation: authority.designation,
-      department: authority.department || '',
-      email: authority.email || '',
-      phone: authority.phone || '',
-      jurisdiction: authority.jurisdiction || {
-        area: '',
-        ward: '',
-        district: '',
-        state: '',
-        constituency: ''
-      },
-      categories: authority.Categories?.map(cat => cat.id) || [],
-      notes: authority.notes || ''
+      categoryId: authority.Categories && authority.Categories[0] ? authority.Categories[0].id : '',
+      subcategoryId: authority.Subcategories && authority.Subcategories[0] ? authority.Subcategories[0].id : '',
+      description: authority.description || ''
     });
     setShowForm(true);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+    const levelLabel = formData.level === '__custom__' ? customLevel.trim() : formData.level;
+    if (formData.level === '__custom__' && !levelLabel) {
+      toast.error('Please enter a custom authority level');
+      return;
+    }
+    const payload = {
+      level: formData.level === '__custom__' ? levelLabel : formData.level,
+      description: formData.notes || levelLabel,
+      categories: formData.categoryId ? [formData.categoryId] : [],
+      subcategories: formData.subcategoryId ? [formData.subcategoryId] : []
+    };
+
     if (editingAuthority) {
-      updateAuthorityMutation.mutate({
-        id: editingAuthority.id,
-        data: formData
-      });
+      updateAuthorityMutation.mutate({ id: editingAuthority.id, data: payload });
     } else {
-      createAuthorityMutation.mutate(formData);
+      createAuthorityMutation.mutate(payload);
     }
   };
 
@@ -154,10 +147,12 @@ const AuthorityManagement = () => {
     }
   };
 
-  const authorityLevels = [
-    'MP', 'MLA', 'Mayor', 'Corporator', 'Ward Member', 
-    'Engineer', 'Contractor', 'Supervisor', 'Other'
-  ];
+  const authorityLevels = useMemo(() => {
+    const base = dynamicAuthorityLevels && dynamicAuthorityLevels.length > 0
+      ? dynamicAuthorityLevels
+      : [];
+    return [...base];
+  }, [dynamicAuthorityLevels]);
 
   if (authoritiesLoading || categoriesLoading) {
     return (
@@ -180,6 +175,7 @@ const AuthorityManagement = () => {
             setEditingAuthority(null);
             resetForm();
             setShowForm(true);
+            setCustomLevel('');
           }}
           className="btn btn-primary flex items-center"
         >
@@ -205,9 +201,8 @@ const AuthorityManagement = () => {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-lg font-medium text-gray-900">{authority.name}</h4>
-                      <p className="text-sm text-gray-600">{authority.designation}</p>
-                      <p className="text-sm text-gray-500">{authority.department}</p>
+                      <h4 className="text-lg font-medium text-gray-900">{authority.level}</h4>
+                      <p className="text-sm text-gray-600">{authority.description}</p>
                       <div className="flex items-center space-x-4 mt-2">
                         {authority.email && (
                           <div className="flex items-center text-sm text-gray-500">
@@ -224,19 +219,19 @@ const AuthorityManagement = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3">
+                <div className="mt-3">
+                  {/* Show badge only if description differs; otherwise avoid duplicate look */}
+                  {(!authority.description || authority.description !== authority.level) && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       {authority.level}
                     </span>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-600">
-                        <strong>Jurisdiction:</strong> {authority.jurisdiction?.area}, {authority.jurisdiction?.ward}, {authority.jurisdiction?.district}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        <strong>Categories:</strong> {authority.Categories?.map(cat => cat.name).join(', ') || 'None'}
-                      </p>
-                    </div>
+                  )}
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600">
+                      <strong>Categories:</strong> {authority.Categories?.map(cat => cat.name).join(', ') || 'None'}
+                    </p>
                   </div>
+                </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -268,175 +263,77 @@ const AuthorityManagement = () => {
               </h3>
               
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                  <select
+                    className="input"
+                    value={formData.categoryId}
+                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value, subcategoryId: '', level: '' })}
+                    required
+                  >
+                    <option value="">Select category</option>
+                    {categories?.map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {formData.categoryId && categories?.find(c => c.id === formData.categoryId)?.Subcategories?.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="input"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Authority Level *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory (optional)</label>
                     <select
-                      value={formData.level}
-                      onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                       className="input"
-                      required
+                      value={formData.subcategoryId}
+                      onChange={(e) => setFormData({ ...formData, subcategoryId: e.target.value, level: '' })}
                     >
-                      {authorityLevels.map(level => (
-                        <option key={level} value={level}>{level}</option>
+                      <option value="">Select subcategory</option>
+                      {categories?.find(c => c.id === formData.categoryId)?.Subcategories?.map((sc) => (
+                        <option key={sc.id} value={sc.id}>{sc.name}</option>
                       ))}
                     </select>
                   </div>
-                </div>
+                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Designation *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.designation}
-                      onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                      className="input"
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Authority Level *
+                  </label>
+                  <div className="flex space-x-2">
+                    <select
+                      value={formData.level}
+                      onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                      className="input flex-1"
                       required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Department
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.department}
-                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      className="input"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="input"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="input"
-                    />
+                      disabled={!formData.categoryId}
+                    >
+                      <option value="">{authorityLevels.length ? 'Select level' : 'Select category first'}</option>
+                      {authorityLevels.map(level => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                      <option value="__custom__">Custom…</option>
+                    </select>
+                    {formData.level === '__custom__' && (
+                      <input
+                        type="text"
+                        placeholder="Enter new authority level"
+                        value={customLevel}
+                        onChange={(e) => setCustomLevel(e.target.value)}
+                        className="input flex-1"
+                      />
+                    )}
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Jurisdiction
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Area"
-                      value={formData.jurisdiction.area}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        jurisdiction: { ...formData.jurisdiction, area: e.target.value }
-                      })}
-                      className="input"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Ward"
-                      value={formData.jurisdiction.ward}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        jurisdiction: { ...formData.jurisdiction, ward: e.target.value }
-                      })}
-                      className="input"
-                    />
-                    <input
-                      type="text"
-                      placeholder="District"
-                      value={formData.jurisdiction.district}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        jurisdiction: { ...formData.jurisdiction, district: e.target.value }
-                      })}
-                      className="input"
-                    />
-                    <input
-                      type="text"
-                      placeholder="State"
-                      value={formData.jurisdiction.state}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        jurisdiction: { ...formData.jurisdiction, state: e.target.value }
-                      })}
-                      className="input"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categories
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {categories?.map((category) => (
-                      <label key={category.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.categories.includes(category.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData({
-                                ...formData,
-                                categories: [...formData.categories, category.id]
-                              });
-                            } else {
-                              setFormData({
-                                ...formData,
-                                categories: formData.categories.filter(id => id !== category.id)
-                              });
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-700">{category.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
+                    Description
                   </label>
                   <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="input"
                     rows={3}
+                    placeholder="Describe this authority level (responsibilities, scope, etc.)"
                   />
                 </div>
 

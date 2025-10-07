@@ -1,15 +1,52 @@
-import React from 'react';
-import { useQuery } from 'react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { Plus, Edit, Trash2, Eye, Users } from 'lucide-react';
-import { officialsAPI } from '../../services/api';
+import { officialsAPI, categoriesAPI, authoritiesAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 
 const OfficialsManagement = () => {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    designation: '',
+    department: '',
+    email: '',
+    phone: '',
+    jurisdiction: { area: '', ward: '', district: '', state: '' },
+    authorityId: '',
+  });
+
   // Fetch officials
   const { data: officialsData, isLoading } = useQuery(
     'adminOfficials',
     () => officialsAPI.getOfficials({ limit: 50 }),
     {
       select: (response) => response.data
+    }
+  );
+
+  // Fetch categories to map official scope
+  const { data: authoritiesList } = useQuery(
+    'authorities-all',
+    () => authoritiesAPI.getAuthorities({ isActive: true }),
+    { select: (res) => res.data?.data || [] }
+  );
+
+  const createOfficialMutation = useMutation(
+    (payload) => officialsAPI.createOfficial(payload),
+    {
+      onSuccess: () => {
+        toast.success('Official created');
+        queryClient.invalidateQueries('adminOfficials');
+        setShowForm(false);
+        setFormData({
+          name: '', designation: '', department: '', email: '', phone: '',
+          jurisdiction: { area: '', ward: '', district: '', state: '' },
+          authorityId: '',
+        });
+      },
+      onError: (e) => toast.error(e.response?.data?.error || 'Failed to create official')
     }
   );
 
@@ -36,7 +73,7 @@ const OfficialsManagement = () => {
           <h2 className="text-2xl font-bold text-gray-900">Officials Management</h2>
           <p className="text-gray-600">Manage government officials and their jurisdictions</p>
         </div>
-        <button className="btn btn-primary flex items-center">
+        <button className="btn btn-primary flex items-center" onClick={() => setShowForm(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add Official
         </button>
@@ -142,6 +179,145 @@ const OfficialsManagement = () => {
           </table>
         </div>
       </div>
+
+      {/* Add/Edit Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Official</h3>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  createOfficialMutation.mutate(formData);
+                }}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Designation *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.designation}
+                      onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.department}
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      className="input"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      className="input"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Jurisdiction - Area</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.jurisdiction.area}
+                      onChange={(e) => setFormData({ ...formData, jurisdiction: { ...formData.jurisdiction, area: e.target.value } })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Jurisdiction - Ward</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.jurisdiction.ward}
+                      onChange={(e) => setFormData({ ...formData, jurisdiction: { ...formData.jurisdiction, ward: e.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Jurisdiction - District</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.jurisdiction.district}
+                      onChange={(e) => setFormData({ ...formData, jurisdiction: { ...formData.jurisdiction, district: e.target.value } })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Jurisdiction - State</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.jurisdiction.state}
+                      onChange={(e) => setFormData({ ...formData, jurisdiction: { ...formData.jurisdiction, state: e.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Authority Level *</label>
+                    <select
+                      className="input"
+                      value={formData.authorityId}
+                      onChange={(e) => setFormData({ ...formData, authorityId: e.target.value })}
+                      required
+                    >
+                      <option value="">Select authority</option>
+                      {authoritiesList.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {(a.name || a.authorityLevel || a.level || 'Unknown')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={createOfficialMutation.isLoading}>
+                    {createOfficialMutation.isLoading ? 'Saving...' : 'Create Official'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

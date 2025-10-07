@@ -1,27 +1,55 @@
 const express = require('express');
-const { Authority, Category } = require('../models');
+const { Authority, Category, Subcategory } = require('../models');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
 
-// Validation middleware
+// Normalize payload then validate
 const validateAuthority = [
-  body('name').trim().isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters'),
-  body('level').isIn(['MP', 'MLA', 'Mayor', 'Corporator', 'Ward Member', 'Engineer', 'Contractor', 'Supervisor', 'Other']).withMessage('Valid authority level required'),
-  body('designation').trim().isLength({ min: 2, max: 100 }).withMessage('Designation must be between 2 and 100 characters'),
-  body('department').optional().trim().isLength({ max: 100 }).withMessage('Department must be less than 100 characters'),
-  body('email').optional().isEmail().withMessage('Valid email required'),
-  body('phone').optional().isMobilePhone('en-IN').withMessage('Valid Indian phone number required'),
-  body('jurisdiction').isObject().withMessage('Jurisdiction information required'),
-  body('categories').isArray().withMessage('Categories must be an array'),
+  // Normalize incoming fields to `level` only
+  (req, _res, next) => {
+    req.body.level = (req.body.level || req.body.authorityLevel || req.body.name || '').toString().trim();
+    if (!Array.isArray(req.body.categories) && req.body.categoryId) {
+      req.body.categories = [req.body.categoryId];
+    }
+    if (!Array.isArray(req.body.subcategories) && req.body.subcategoryId) {
+      req.body.subcategories = [req.body.subcategoryId];
+    }
+    next();
+  },
+  // Ensure one of authorityLevel/level/name is provided and valid
+  body('level').custom((lvl) => {
+    if (!lvl || lvl.length < 2 || lvl.length > 100) {
+      throw new Error('Authority level must be 2-100 characters');
+    }
+    return true;
+  }),
+  // Either categories (array) or categoryId (single) must be provided
+  body(['categories', 'categoryId']).custom((value, { req }) => {
+    const categories = Array.isArray(req.body.categories) ? req.body.categories : [];
+    if (!categories || categories.length === 0) {
+      throw new Error('Category is required');
+    }
+    return true;
+  }),
+  body('subcategories')
+    .optional()
+    .isArray()
+    .withMessage('Subcategories must be an array'),
+  body(['description', 'notes'])
+    .optional()
+    .isString()
+    .isLength({ max: 1000 })
+    .withMessage('Notes must be a string of reasonable length'),
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
+      console.error('Authority validation failed:', {
+        body: req.body,
+        errors: errors.array()
       });
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
     }
     next();
   }
@@ -45,9 +73,16 @@ router.get('/', async (req, res) => {
           through: { attributes: [] },
           where: categoryId ? { id: categoryId } : undefined,
           required: categoryId ? true : false
+        },
+        {
+          model: Subcategory,
+          as: 'Subcategories',
+          through: { attributes: [] },
+          required: false
         }
       ],
-      order: [['name', 'ASC']]
+      attributes: { include: [] },
+      order: [['level', 'ASC']]
     });
 
     res.json({ data: authorities });
@@ -82,16 +117,34 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new authority (Admin only)
-router.post('/', authenticateToken, requireAdmin, validateAuthority, async (req, res) => {
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { categories, ...authorityData } = req.body;
-    
-    const authority = await Authority.create(authorityData);
+    // Normalize
+    const level = (req.body.level || req.body.authorityLevel || req.body.name || '').toString().trim();
+    const description = req.body.description || req.body.notes || '';
+    const categories = Array.isArray(req.body.categories)
+      ? req.body.categories
+      : (req.body.categoryId ? [req.body.categoryId] : []);
+    const subcategories = Array.isArray(req.body.subcategories)
+      ? req.body.subcategories
+      : (req.body.subcategoryId ? [req.body.subcategoryId] : []);
+
+    if (!level || level.length < 2 || level.length > 100) {
+      return res.status(400).json({ error: 'Validation failed', details: [{ path: 'level', msg: 'Authority level must be 2-100 characters' }] });
+    }
+    if (!categories || categories.length === 0) {
+      return res.status(400).json({ error: 'Validation failed', details: [{ path: 'categories', msg: 'Category is required' }] });
+    }
+
+    const authority = await Authority.create({
+      level,
+      description,
+      isActive: true
+    });
     
     // Associate with categories
-    if (categories && categories.length > 0) {
-      await authority.setCategories(categories);
-    }
+    if (categories && categories.length > 0) await authority.setCategories(categories);
+    if (subcategories && subcategories.length > 0) await authority.setSubcategories(subcategories);
 
     // Fetch with categories
     const authorityWithCategories = await Authority.findByPk(authority.id, {
@@ -106,27 +159,41 @@ router.post('/', authenticateToken, requireAdmin, validateAuthority, async (req,
 
     res.status(201).json({ data: authorityWithCategories });
   } catch (error) {
-    console.error('Error creating authority:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error creating authority:', error, 'Body:', req.body);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });
 
 // Update authority (Admin only)
-router.put('/:id', authenticateToken, requireAdmin, validateAuthority, async (req, res) => {
+router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { categories, ...authorityData } = req.body;
+    const level = (req.body.level || req.body.authorityLevel || req.body.name || '').toString().trim();
+    const description = req.body.description || req.body.notes || '';
+    const categories = Array.isArray(req.body.categories)
+      ? req.body.categories
+      : (req.body.categoryId ? [req.body.categoryId] : undefined);
+    const subcategories = Array.isArray(req.body.subcategories)
+      ? req.body.subcategories
+      : (req.body.subcategoryId ? [req.body.subcategoryId] : undefined);
+
+    if (!level || level.length < 2 || level.length > 100) {
+      return res.status(400).json({ error: 'Validation failed', details: [{ path: 'level', msg: 'Authority level must be 2-100 characters' }] });
+    }
     
     const authority = await Authority.findByPk(req.params.id);
     if (!authority) {
       return res.status(404).json({ error: 'Authority not found' });
     }
 
-    await authority.update(authorityData);
+    await authority.update({
+      level,
+      description,
+      isActive: authority.isActive !== undefined ? authority.isActive : true
+    });
     
-    // Update category associations
-    if (categories !== undefined) {
-      await authority.setCategories(categories);
-    }
+    // Update associations
+    if (categories !== undefined) await authority.setCategories(categories);
+    if (subcategories !== undefined) await authority.setSubcategories(subcategories);
 
     // Fetch with categories
     const updatedAuthority = await Authority.findByPk(authority.id, {
@@ -175,12 +242,35 @@ router.get('/category/:categoryId', async (req, res) => {
           where: { id: req.params.categoryId }
         }
       ],
-      order: [['level', 'ASC'], ['name', 'ASC']]
+      order: [['level', 'ASC']]
     });
 
     res.json({ data: authorities });
   } catch (error) {
     console.error('Error fetching authorities by category:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get authorities by subcategory
+router.get('/subcategory/:subcategoryId', async (req, res) => {
+  try {
+    const authorities = await Authority.findAll({
+      where: { isActive: true },
+      include: [
+        {
+          model: Subcategory,
+          as: 'Subcategories',
+          through: { attributes: [] },
+          where: { id: req.params.subcategoryId }
+        }
+      ],
+      order: [['level', 'ASC']]
+    });
+
+    res.json({ data: authorities });
+  } catch (error) {
+    console.error('Error fetching authorities by subcategory:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

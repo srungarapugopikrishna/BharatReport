@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { Admin } = require('../models');
 
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -38,7 +39,8 @@ const requireRole = (roles) => {
   };
 };
 
-const requireAdmin = requireRole(['admin']);
+const requireAdmin = requireRole(['admin', 'superadmin']);
+const requireModerator = requireRole(['moderator', 'admin', 'superadmin']);
 
 const optionalAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -64,5 +66,6 @@ module.exports = {
   authenticateToken,
   requireRole,
   requireAdmin,
+  requireModerator,
   optionalAuth
 };

@@ -21,8 +21,8 @@ const Issue = sequelize.define('Issue', {
     allowNull: false
   },
   status: {
-    type: DataTypes.ENUM('open', 'in_progress', 'resolved', 'verified', 'closed'),
-    defaultValue: 'open'
+    type: DataTypes.ENUM('pending', 'open', 'in_progress', 'resolved', 'verified', 'closed', 'rejected'),
+    defaultValue: 'pending'
   },
   priority: {
     type: DataTypes.ENUM('low', 'medium', 'high', 'urgent'),
@@ -93,6 +93,9 @@ const Issue = sequelize.define('Issue', {
   verifiedAt: {
     type: DataTypes.DATE
   },
+  approvedAt: {
+    type: DataTypes.DATE
+  },
   escalatedAt: {
     type: DataTypes.DATE
   },
@@ -102,6 +105,26 @@ const Issue = sequelize.define('Issue', {
       model: 'Officials',
       key: 'id'
     }
+  },
+  rejectionReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  approvedBy: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  mlaInfo: {
+    type: DataTypes.JSONB, // Store MLA name, party, constituency, etc.
+    allowNull: true
+  },
+  mpInfo: {
+    type: DataTypes.JSONB, // Store MP name, party, constituency, etc.
+    allowNull: true
   }
 }, {
   indexes: [

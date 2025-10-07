@@ -10,6 +10,7 @@ const { syncDatabase } = require('./models');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 const issueRoutes = require('./routes/issues');
 const categoryRoutes = require('./routes/categories');
 const officialRoutes = require('./routes/officials');
@@ -22,13 +23,15 @@ const PORT = process.env.PORT || 5000;
 // Security middleware
 app.use(helmet());
 
-// Rate limiting
+// Rate limiting (disabled in non-production to ease local development)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.'
 });
-app.use(limiter);
+if (process.env.NODE_ENV === 'production') {
+  app.use(limiter);
+}
 
 // CORS configuration
 app.use(cors({
@@ -48,6 +51,9 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
+// NOTE: CSRF disabled for now (misconfigured without session/cookies).
+// Re-enable after we add cookie/session and client token handling.
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
@@ -59,6 +65,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/issues', issueRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/officials', officialRoutes);

@@ -14,6 +14,7 @@
     "build": "cd server && npm install",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install",
     "start": "cd server && npm start",
+    "postinstall": "cd server && npm install",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:restart": "docker-compose restart",

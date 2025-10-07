@@ -12,16 +12,13 @@ services:
         generateValue: true
       - key: PORT
         value: 5000
-      # Use either a single DATABASE_URL or discrete vars below
-      # - key: DATABASE_URL
-      #   sync: false
-      # - key: DB_HOST
-      #   sync: false
-      # - key: DB_PORT
-      #   value: 5432
-      # - key: DB_NAME
-      #   value: janata_report
-      # - key: DB_USER
-      #   sync: false
-      # - key: DB_PASSWORD
-      #   sync: false
+      - key: DB_HOST
+        value: dpg-d3ikkkk9c44c73aslfmg-a
+      - key: DB_PORT
+        value: 5432
+      - key: DB_NAME
+        value: janata_report
+      - key: DB_USER
+        value: postgres_admin
+      - key: DB_PASSWORD
+        value: Wdlcl1JxA9hQI4rxWYbd7E9wiwJXAIuq

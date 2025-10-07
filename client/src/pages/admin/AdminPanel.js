@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Users, Settings, BarChart3, FileText, Plus, Eye } from 'lucide-react';
+import { Users, Settings, BarChart3, FileText, Plus, Eye, ClipboardList } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import CategoriesManagement from '../admin/CategoriesManagement';
 import OfficialsManagement from '../admin/OfficialsManagement';
 import AuthorityManagement from '../admin/AuthorityManagement';
 import UsersManagement from '../admin/UsersManagement';
+import IssuesManagement from '../admin/IssuesManagement';
 import AdminDashboard from '../admin/AdminDashboard';
 
 const AdminPanel = () => {
@@ -14,6 +15,7 @@ const AdminPanel = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: BarChart3 },
+    { name: 'Issues', href: '/admin/issues', icon: ClipboardList },
     { name: 'Categories', href: '/admin/categories', icon: FileText },
     { name: 'Officials', href: '/admin/officials', icon: Users },
     { name: 'Authorities', href: '/admin/authorities', icon: Users },
@@ -29,7 +31,7 @@ const AdminPanel = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Admin Panel</h1>
@@ -60,10 +62,11 @@ const AdminPanel = () => {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 overflow-x-visible">
             <Routes>
               <Route path="/" element={<AdminDashboard />} />
               <Route path="/categories" element={<CategoriesManagement />} />
+              <Route path="/issues" element={<IssuesManagement />} />
               <Route path="/officials" element={<OfficialsManagement />} />
               <Route path="/authorities" element={<AuthorityManagement />} />
               <Route path="/users" element={<UsersManagement />} />

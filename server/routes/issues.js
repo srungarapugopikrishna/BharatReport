@@ -55,13 +55,28 @@ router.get('/', optionalAuth, async (req, res) => {
       };
     }
 
+    // Visibility: hide pending for non-admins and non-owners
+    if (!req.user || req.user.role !== 'admin') {
+      where[Op.or] = [
+        { status: { [Op.ne]: 'pending' } },
+        req.user ? { userId: req.user.id } : null
+      ].filter(Boolean);
+    }
+
     const { count, rows: issues } = await Issue.findAndCountAll({
       where,
+      attributes: [
+        'id', 'issueId', 'title', 'description', 'status', 'priority', 
+        'location', 'media', 'isAnonymous', 'upvotes', 'createdAt', 'updatedAt',
+        'categoryId', 'subcategoryId', 'assignedOfficials', 'assignedAuthorityId',
+        'resolutionNotes', 'resolutionMedia', 'resolvedAt', 'verifiedAt', 'approvedAt',
+        'escalatedAt', 'escalatedTo', 'rejectionReason', 'approvedBy', 'userId',
+        'mlaInfo', 'mpInfo'
+      ],
       include: [
         { model: Category, attributes: ['id', 'name', 'nameHindi', 'nameTelugu', 'color', 'icon'] },
         { model: Subcategory, attributes: ['id', 'name', 'nameHindi', 'nameTelugu'] },
-        { model: User, attributes: ['id', 'name'], required: false },
-        { model: Authority, attributes: ['id', 'name', 'level', 'designation', 'department'], required: false }
+        { model: User, attributes: ['id', 'name'], required: false }
       ],
       order: [[sortBy, sortOrder]],
       limit: parseInt(limit),
@@ -87,11 +102,18 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const issue = await Issue.findByPk(req.params.id, {
+      attributes: [
+        'id', 'issueId', 'title', 'description', 'status', 'priority', 
+        'location', 'media', 'isAnonymous', 'upvotes', 'createdAt', 'updatedAt',
+        'categoryId', 'subcategoryId', 'assignedOfficials', 'assignedAuthorityId',
+        'resolutionNotes', 'resolutionMedia', 'resolvedAt', 'verifiedAt', 'approvedAt',
+        'escalatedAt', 'escalatedTo', 'rejectionReason', 'approvedBy', 'userId',
+        'mlaInfo', 'mpInfo'
+      ],
       include: [
         { model: Category, attributes: ['id', 'name', 'nameHindi', 'nameTelugu', 'color', 'icon'] },
         { model: Subcategory, attributes: ['id', 'name', 'nameHindi', 'nameTelugu'] },
         { model: User, attributes: ['id', 'name'], required: false },
-        { model: Authority, attributes: ['id', 'name', 'level', 'designation', 'department', 'email', 'phone'], required: false },
         {
           model: Comment,
           include: [
@@ -105,6 +127,15 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     if (!issue) {
       return res.status(404).json({ error: 'Issue not found' });
+    }
+
+    // Restrict viewing pending issue to owner or admin
+    if (issue.status === 'pending') {
+      const isOwner = req.user && issue.userId && issue.userId === req.user.id;
+      const isAdmin = req.user && req.user.role === 'admin';
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: 'Issue pending approval' });
+      }
     }
 
     // Debug: log media data
@@ -145,7 +176,9 @@ router.post('/', authenticateToken, validateIssue, async (req, res) => {
       userId: req.user.isAnonymous ? null : req.user.id,
       categoryId: req.body.categoryId,
       subcategoryId: req.body.subcategoryId,
-      assignedOfficials: req.body.assignedOfficials || []
+      assignedOfficials: req.body.assignedOfficials || [],
+      mlaInfo: req.body.mlaInfo || null,
+      mpInfo: req.body.mpInfo || null
     });
 
     // Auto-assign officials based on location and category

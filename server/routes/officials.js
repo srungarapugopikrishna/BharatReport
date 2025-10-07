@@ -1,6 +1,6 @@
 const express = require('express');
 const { Op } = require('sequelize');
-const { Official, Issue, Category } = require('../models');
+const { Official, Issue, Category, Authority } = require('../models');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
 
     const officials = await Official.findAndCountAll({
       where,
+      include: [{ model: Authority }],
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [['name', 'ASC']]
@@ -101,7 +102,7 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => 
       email,
       phone,
       jurisdiction,
-      categories
+      authorityId
     } = req.body;
 
     const official = await Official.create({
@@ -111,7 +112,7 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => 
       email,
       phone,
       jurisdiction,
-      categories: categories || []
+      authorityId: authorityId || null
     });
 
     res.status(201).json(official);
@@ -136,7 +137,7 @@ router.put('/:id', authenticateToken, requireRole(['admin']), async (req, res) =
       email,
       phone,
       jurisdiction,
-      categories,
+      authorityId,
       isActive
     } = req.body;
 
@@ -147,7 +148,7 @@ router.put('/:id', authenticateToken, requireRole(['admin']), async (req, res) =
       email,
       phone,
       jurisdiction,
-      categories: categories || official.categories,
+      authorityId: authorityId !== undefined ? authorityId : official.authorityId,
       isActive
     });
 

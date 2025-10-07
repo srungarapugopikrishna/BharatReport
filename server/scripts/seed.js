@@ -1,3 +1,109 @@
+require('dotenv').config();
+const { sequelize, Category, Subcategory } = require('../models');
+
+const mapping = {
+  "Roads & Transport": {
+    "Potholes": ["Corporator", "Municipal Engineer", "Contractor", "MLA", "MP"],
+    "Broken Footpaths": ["Corporator", "Municipal Engineer", "Contractor"],
+    "Streetlights not working": ["Corporator", "Municipal Engineer", "Electricity Department"],
+    "Encroachment": ["Corporator", "Municipal Commissioner", "Town Planning Officer"],
+    "Illegal Parking": ["Traffic Police", "Corporator"],
+    "Missing Signboards": ["Municipal Engineer", "Traffic Department"],
+    "Wrong Speed Breakers": ["Corporator", "Municipal Engineer"]
+  },
+  "Traffic & Safety": {
+    "Traffic Signal Not Working": ["Traffic Police", "Municipal Engineer"],
+    "Dangerous Intersections": ["Traffic Police", "Corporator", "Urban Planning Department"],
+    "Missing Pedestrian Crossings": ["Traffic Police", "Urban Planning Department"],
+    "Illegal Auto/Taxi Stands": ["Traffic Police", "RTO", "Corporator"]
+  },
+  "Water Supply & Drainage": {
+    "No Water Supply": ["Water Board Engineer", "Corporator", "MLA"],
+    "Leakage": ["Water Board Engineer", "Corporator"],
+    "Contaminated Water": ["Water Board", "Public Health Department"],
+    "Open Drains": ["Corporator", "Municipal Engineer"],
+    "Blocked Sewage": ["Corporator", "Sewage Board"]
+  },
+  "Electricity & Power": {
+    "Power Cuts": ["Electricity Board", "MLA"],
+    "Unsafe Electrical Poles/Wires": ["Electricity Board Engineer", "Corporator"],
+    "Faulty Transformers": ["Electricity Board", "Engineer"],
+    "No Streetlights": ["Corporator", "Electricity Board"]
+  },
+  "Sanitation & Waste": {
+    "Garbage Not Collected": ["Corporator", "Sanitation Supervisor", "Municipal Commissioner"],
+    "Overflowing Bins": ["Sanitation Department", "Corporator"],
+    "Open Dumping": ["Sanitation Department", "Municipal Commissioner"],
+    "Public Toilet Maintenance": ["Municipal Engineer", "Health Department"]
+  },
+  "Environment": {
+    "Tree Cutting": ["Forest Department", "Municipal Commissioner"],
+    "Air Pollution": ["Pollution Control Board", "Municipal Commissioner"],
+    "Water Pollution": ["Pollution Control Board", "Water Board"],
+    "Illegal Construction Near Lakes": ["Urban Development Authority", "Municipal Commissioner"]
+  },
+  "Health & Safety": {
+    "Dengue Breeding Spots": ["Health Department", "Corporator"],
+    "Lack of Fogging": ["Municipal Health Officer"],
+    "Lack of Ambulances": ["Health Department", "Hospital Authority"],
+    "Hospital Negligence": ["Hospital Authority", "Health Department"]
+  },
+  "Law & Order": {
+    "Eve-teasing Hotspots": ["Local Police Station", "Women Safety Cell"],
+    "Illegal Alcohol Outlets": ["Excise Department", "Police"],
+    "Public Nuisance": ["Police", "Corporator"]
+  },
+  "Education": {
+    "Broken Infrastructure in Government Schools": ["School Management", "Education Department"],
+    "Lack of Teachers": ["Education Department", "MLA"]
+  },
+  "Public Transport": {
+    "Poor Bus Frequency": ["Transport Corporation", "MLA"],
+    "Damaged Bus Shelters": ["Corporator", "Transport Department"],
+    "Unsafe Metro Stations": ["Metro Rail Authority", "Safety Cell"]
+  },
+  "Welfare & Governance": {
+    "Pension Delays": ["Social Welfare Department"],
+    "Ration Card Issues": ["Civil Supplies Department"],
+    "Aadhaar Errors": ["UIDAI Center", "District Administration"],
+    "Corruption": ["Anti-Corruption Bureau", "Lokayukta"]
+  },
+  "Miscellaneous": {
+    "Stray Dogs/Cattle": ["Municipal Veterinary Department"],
+    "Fire Hazards": ["Fire Department", "Municipal Commissioner"],
+    "Public Encroachments": ["Town Planning Department", "Corporator"]
+  }
+};
+
+async function seed() {
+  try {
+    await sequelize.authenticate();
+    console.log('DB connected. Seeding categories/subcategories...');
+
+    for (const [categoryName, subcats] of Object.entries(mapping)) {
+      const [category] = await Category.findOrCreate({
+        where: { name: categoryName },
+        defaults: { name: categoryName }
+      });
+
+      for (const subName of Object.keys(subcats)) {
+        await Subcategory.findOrCreate({
+          where: { name: subName, categoryId: category.id },
+          defaults: { name: subName, categoryId: category.id }
+        });
+      }
+    }
+
+    console.log('Seeding complete.');
+    process.exit(0);
+  } catch (err) {
+    console.error('Seeding failed:', err);
+    process.exit(1);
+  }
+}
+
+seed();
+
 const { Category, Subcategory, Official, User } = require('../models');
 const { syncDatabase } = require('../models');
 

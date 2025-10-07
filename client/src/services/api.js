@@ -9,6 +9,14 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+// CSRF header hook (if backend requires a custom header)
+api.interceptors.request.use((config) => {
+  const csrf = localStorage.getItem('csrfToken');
+  if (csrf) {
+    config.headers['X-CSRF-Token'] = csrf;
+  }
+  return config;
+});
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -43,6 +51,7 @@ export const authAPI = {
   googleLogin: (googleToken) => api.post('/auth/google', { token: googleToken }),
   getCurrentUser: () => api.get('/auth/me'),
   updateProfile: (profileData) => api.put('/auth/profile', profileData),
+  bootstrapAdmin: (email, secret) => api.post('/auth/bootstrap-admin', { email, secret }),
 };
 
 // Issues API
@@ -55,6 +64,7 @@ export const issuesAPI = {
   addComment: (id, commentData) => api.post(`/issues/${id}/comments`, commentData),
   upvoteIssue: (id) => api.post(`/issues/${id}/upvote`),
   getMyIssues: (params) => api.get('/issues/user/my-issues', { params }),
+  flagIssue: (id, reason) => api.post(`/issues/${id}/flag`, { reason }),
 };
 
 // Categories API
@@ -90,6 +100,7 @@ export const authoritiesAPI = {
   updateAuthority: (id, data) => api.put(`/authorities/${id}`, data),
   deleteAuthority: (id) => api.delete(`/authorities/${id}`),
   getAuthoritiesByCategory: (categoryId) => api.get(`/authorities/category/${categoryId}`),
+  getAuthoritiesBySubcategory: (subcategoryId) => api.get(`/authorities/subcategory/${subcategoryId}`),
 };
 
 // Analytics API
@@ -98,6 +109,39 @@ export const analyticsAPI = {
   getHeatmap: (params) => api.get('/analytics/heatmap', { params }),
   getCategoryAnalytics: (params) => api.get('/analytics/categories', { params }),
   getOfficialAnalytics: () => api.get('/analytics/officials'),
+};
+
+// Admin API
+export const adminAPI = {
+  getIssues: (params) => api.get('/admin/issues', { params }),
+  approveIssue: (id) => api.post(`/admin/issues/${id}/approve`),
+  rejectIssue: (id, reason) => api.post(`/admin/issues/${id}/reject`, { reason }),
+  editIssue: (id, data) => api.put(`/admin/issues/${id}`, data),
+  listUsers: () => api.get('/admin/users'),
+  banUser: (id) => api.post(`/admin/users/${id}/ban`),
+  unbanUser: (id) => api.post(`/admin/users/${id}/unban`),
+  listCategories: () => api.get('/admin/categories'),
+  createCategory: (data) => api.post('/admin/categories', data),
+  updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
+};
+
+// Constituency API
+export const constituencyAPI = {
+  findConstituencies: (lat, lng) => {
+    const url = `http://localhost:8000/api/find-constituencies/?format=json&lat=${lat}&lng=${lng}`;
+    return fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    });
+  }
 };
 
 // File upload utility

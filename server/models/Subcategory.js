@@ -22,6 +22,11 @@ const Subcategory = sequelize.define('Subcategory', {
   description: {
     type: DataTypes.TEXT
   },
+  authorityTypes: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: []
+  },
   categoryId: {
     type: DataTypes.UUID,
     allowNull: false,

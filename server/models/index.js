@@ -7,6 +7,7 @@ const Authority = require('./Authority');
 const Issue = require('./Issue');
 const Comment = require('./Comment');
 const Upvote = require('./Upvote');
+const AuditLog = require('./AuditLog');
 
 // Define associations
 User.hasMany(Issue, { foreignKey: 'userId' });
@@ -37,11 +38,26 @@ User.hasMany(Upvote, { foreignKey: 'userId' });
 Upvote.belongsTo(User, { foreignKey: 'userId' });
 
 // Authority associations
-Authority.belongsToMany(Category, { through: 'AuthorityCategories' });
-Category.belongsToMany(Authority, { through: 'AuthorityCategories' });
+Authority.belongsToMany(Category, { through: 'AuthorityCategories', as: 'Categories', foreignKey: 'authorityId' });
+Category.belongsToMany(Authority, { through: 'AuthorityCategories', as: 'Authorities', foreignKey: 'categoryId' });
+
+// New: Authority <-> Subcategory mapping
+Authority.belongsToMany(Subcategory, { through: 'AuthoritySubcategories', as: 'Subcategories', foreignKey: 'authorityId' });
+Subcategory.belongsToMany(Authority, { through: 'AuthoritySubcategories', as: 'Authorities', foreignKey: 'subcategoryId' });
+
+// Map Official to Authority (many officials per authority)
+Authority.hasMany(Official, { foreignKey: 'authorityId' });
+Official.belongsTo(Authority, { foreignKey: 'authorityId' });
 
 Authority.hasMany(Issue, { foreignKey: 'assignedAuthorityId' });
 Issue.belongsTo(Authority, { foreignKey: 'assignedAuthorityId' });
+
+// Audit log associations to User (admins are users with role=admin)
+User.hasMany(AuditLog, { foreignKey: 'adminId' });
+AuditLog.belongsTo(User, { foreignKey: 'adminId' });
+
+// Approval association to User
+Issue.belongsTo(User, { as: 'approver', foreignKey: 'approvedBy' });
 
 // Sync database
 const syncDatabase = async () => {
@@ -70,5 +86,6 @@ module.exports = {
   Issue,
   Comment,
   Upvote,
+  AuditLog,
   syncDatabase
 };

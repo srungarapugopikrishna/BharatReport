@@ -1,6 +1,6 @@
 const express = require('express');
 const { Category, Subcategory } = require('../models');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
           model: Subcategory,
           where: { isActive: true },
           required: false,
-          attributes: ['id', 'name', 'nameHindi', 'nameTelugu', 'description']
+          attributes: ['id', 'name', 'nameHindi', 'nameTelugu', 'description', 'authorityTypes']
         }
       ],
       order: [['name', 'ASC']]
@@ -36,7 +36,7 @@ router.get('/:id', async (req, res) => {
           model: Subcategory,
           where: { isActive: true },
           required: false,
-          attributes: ['id', 'name', 'nameHindi', 'nameTelugu', 'description']
+          attributes: ['id', 'name', 'nameHindi', 'nameTelugu', 'description', 'authorityTypes']
         }
       ]
     });
@@ -53,7 +53,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create category (admin only)
-router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => {
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, nameHindi, nameTelugu, description, icon, color } = req.body;
 
@@ -74,7 +74,7 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => 
 });
 
 // Update category (admin only)
-router.put('/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const category = await Category.findByPk(req.params.id);
     if (!category) {
@@ -101,7 +101,7 @@ router.put('/:id', authenticateToken, requireRole(['admin']), async (req, res) =
 });
 
 // Delete category (admin only)
-router.delete('/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const category = await Category.findByPk(req.params.id);
     if (!category) {
@@ -135,15 +135,17 @@ router.get('/:categoryId/subcategories', async (req, res) => {
 });
 
 // Create subcategory (admin only)
-router.post('/:categoryId/subcategories', authenticateToken, requireRole(['admin']), async (req, res) => {
+router.post('/:categoryId/subcategories', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, nameHindi, nameTelugu, description } = req.body;
+    const { name, nameHindi, nameTelugu, description, authorityTypes, isActive } = req.body;
 
     const subcategory = await Subcategory.create({
       name,
       nameHindi,
       nameTelugu,
       description,
+      authorityTypes,
+      isActive,
       categoryId: req.params.categoryId
     });
 
@@ -155,20 +157,21 @@ router.post('/:categoryId/subcategories', authenticateToken, requireRole(['admin
 });
 
 // Update subcategory (admin only)
-router.put('/subcategories/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+router.put('/subcategories/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const subcategory = await Subcategory.findByPk(req.params.id);
     if (!subcategory) {
       return res.status(404).json({ error: 'Subcategory not found' });
     }
 
-    const { name, nameHindi, nameTelugu, description, isActive } = req.body;
+    const { name, nameHindi, nameTelugu, description, isActive, authorityTypes } = req.body;
     
     await subcategory.update({
       name,
       nameHindi,
       nameTelugu,
       description,
+      authorityTypes,
       isActive
     });
 
@@ -180,7 +183,7 @@ router.put('/subcategories/:id', authenticateToken, requireRole(['admin']), asyn
 });
 
 // Delete subcategory (admin only)
-router.delete('/subcategories/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+router.delete('/subcategories/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const subcategory = await Subcategory.findByPk(req.params.id);
     if (!subcategory) {

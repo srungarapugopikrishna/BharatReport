@@ -62,6 +62,23 @@ router.post('/register', validateUser, async (req, res) => {
   }
 });
 
+// Promote a user to admin (bootstrap). Protect behind ENV secret.
+router.post('/bootstrap-admin', async (req, res) => {
+  try {
+    const { email, secret } = req.body;
+    if (secret !== (process.env.ADMIN_BOOTSTRAP_SECRET || 'bootstrap-secret')) {
+      return res.status(403).json({ error: 'Invalid bootstrap secret' });
+    }
+    const user = await User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.role = 'admin';
+    await user.save();
+    res.json({ success: true, user: { id: user.id, email: user.email, role: user.role } });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to bootstrap admin' });
+  }
+});
+
 // Login
 router.post('/login', async (req, res) => {
   try {

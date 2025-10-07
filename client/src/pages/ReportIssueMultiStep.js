@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Upload, X, CheckCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { categoriesAPI, issuesAPI } from '../services/api';
+import { categoriesAPI, issuesAPI, constituencyAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import OpenStreetMapPicker from '../components/OpenStreetMapPicker';
 
@@ -23,83 +23,12 @@ const ReportIssueMultiStep = () => {
   const [mapLocation, setMapLocation] = useState(null);
   const [resetMap, setResetMap] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [mlaInfo, setMlaInfo] = useState(null);
+  const [mpInfo, setMpInfo] = useState(null);
+  const [isFetchingConstituency, setIsFetchingConstituency] = useState(false);
   const totalSteps = 5;
 
-  // Authority mapping based on category and subcategory
-  // Maps to actual authority levels and designations in the database
-  const authorityMapping = {
-    "Roads & Transport": {
-      "Potholes": ["Corporator", "Municipal Engineer", "Contractor", "MLA", "MP"],
-      "Broken Footpaths": ["Corporator", "Municipal Engineer", "Contractor"],
-      "Streetlights not working": ["Corporator", "Municipal Engineer", "Electricity Department"],
-      "Encroachment": ["Corporator", "Municipal Commissioner", "Town Planning Officer"],
-      "Illegal Parking": ["Traffic Police", "Corporator"],
-      "Missing Signboards": ["Municipal Engineer", "Traffic Department"],
-      "Wrong Speed Breakers": ["Corporator", "Municipal Engineer"]
-    },
-    "Traffic & Safety": {
-      "Traffic Signal Not Working": ["Traffic Police", "Municipal Engineer"],
-      "Dangerous Intersections": ["Traffic Police", "Corporator", "Urban Planning Department"],
-      "Missing Pedestrian Crossings": ["Traffic Police", "Urban Planning Department"],
-      "Illegal Auto/Taxi Stands": ["Traffic Police", "RTO", "Corporator"]
-    },
-    "Water Supply & Drainage": {
-      "No Water Supply": ["Water Board Engineer", "Corporator", "MLA"],
-      "Leakage": ["Water Board Engineer", "Corporator"],
-      "Contaminated Water": ["Water Board", "Public Health Department"],
-      "Open Drains": ["Corporator", "Municipal Engineer"],
-      "Blocked Sewage": ["Corporator", "Sewage Board"]
-    },
-    "Electricity & Power": {
-      "Power Cuts": ["Electricity Board", "MLA"],
-      "Unsafe Electrical Poles/Wires": ["Electricity Board Engineer", "Corporator"],
-      "Faulty Transformers": ["Electricity Board", "Engineer"],
-      "No Streetlights": ["Corporator", "Electricity Board"]
-    },
-    "Sanitation & Waste": {
-      "Garbage Not Collected": ["Corporator", "Sanitation Supervisor", "Municipal Commissioner"],
-      "Overflowing Bins": ["Sanitation Department", "Corporator"],
-      "Open Dumping": ["Sanitation Department", "Municipal Commissioner"],
-      "Public Toilet Maintenance": ["Municipal Engineer", "Health Department"]
-    },
-    "Environment": {
-      "Tree Cutting": ["Forest Department", "Municipal Commissioner"],
-      "Air Pollution": ["Pollution Control Board", "Municipal Commissioner"],
-      "Water Pollution": ["Pollution Control Board", "Water Board"],
-      "Illegal Construction Near Lakes": ["Urban Development Authority", "Municipal Commissioner"]
-    },
-    "Health & Safety": {
-      "Dengue Breeding Spots": ["Health Department", "Corporator"],
-      "Lack of Fogging": ["Municipal Health Officer"],
-      "Lack of Ambulances": ["Health Department", "Hospital Authority"],
-      "Hospital Negligence": ["Hospital Authority", "Health Department"]
-    },
-    "Law & Order": {
-      "Eve-teasing Hotspots": ["Local Police Station", "Women Safety Cell"],
-      "Illegal Alcohol Outlets": ["Excise Department", "Police"],
-      "Public Nuisance": ["Police", "Corporator"]
-    },
-    "Education": {
-      "Broken Infrastructure in Government Schools": ["School Management", "Education Department"],
-      "Lack of Teachers": ["Education Department", "MLA"]
-    },
-    "Public Transport": {
-      "Poor Bus Frequency": ["Transport Corporation", "MLA"],
-      "Damaged Bus Shelters": ["Corporator", "Transport Department"],
-      "Unsafe Metro Stations": ["Metro Rail Authority", "Safety Cell"]
-    },
-    "Welfare & Governance": {
-      "Pension Delays": ["Social Welfare Department"],
-      "Ration Card Issues": ["Civil Supplies Department"],
-      "Aadhaar Errors": ["UIDAI Center", "District Administration"],
-      "Corruption": ["Anti-Corruption Bureau", "Lokayukta"]
-    },
-    "Miscellaneous": {
-      "Stray Dogs/Cattle": ["Municipal Veterinary Department"],
-      "Fire Hazards": ["Fire Department", "Municipal Commissioner"],
-      "Public Encroachments": ["Town Planning Department", "Corporator"]
-    }
-  };
+  // Authority types will be sourced from Subcategory.authorityTypes (DB)
   
 
   const {
@@ -120,6 +49,7 @@ const ReportIssueMultiStep = () => {
   });
 
   const selectedCategoryId = watch('categoryId');
+  const selectedSubcategoryId = watch('subcategoryId');
 
   // Helper function to get localized name
   const getLocalizedName = (item) => {
@@ -148,88 +78,39 @@ const ReportIssueMultiStep = () => {
     setCurrentStep(step);
   };
 
-  // Fetch categories
+  // Load categories
   const { data: categories, isLoading: categoriesLoading } = useQuery(
     'categories',
-    () => categoriesAPI.getCategories(),
-    {
-      select: (response) => response.data
-    }
+    () => categoriesAPI.getCategories().then(r => r.data),
   );
 
-  // Fetch subcategories when category changes
+  const categoriesList = Array.isArray(categories) ? categories : (categories && Array.isArray(categories.data) ? categories.data : []);
+
+  // When category changes, set subcategories
   useEffect(() => {
-    if (selectedCategoryId && categories) {
-      const category = categories.find(cat => cat.id === selectedCategoryId);
-      if (category && category.Subcategories) {
-        setSubcategories(category.Subcategories);
-        setValue('subcategoryId', ''); // Reset subcategory when category changes
-      }
+    if (selectedCategoryId && categoriesList.length) {
+      const selected = categoriesList.find(c => c.id === selectedCategoryId);
+      setSubcategories(selected?.Subcategories || []);
+      // reset selected subcategory when category changes
+      setValue('subcategoryId', '');
     } else {
       setSubcategories([]);
     }
-  }, [selectedCategoryId, categories, setValue]);
+  }, [selectedCategoryId, categoriesList, setValue]);
 
-  // Function to get relevant authorities based on category and subcategory
-  const getRelevantAuthorities = (categoryName, subcategoryName) => {
-    console.log('getRelevantAuthorities called with:', { categoryName, subcategoryName });
-    
-    if (!categoryName || !subcategoryName) {
-      console.log('Missing category or subcategory name');
-      return [];
-    }
-    
-    const categoryMapping = authorityMapping[categoryName];
-    console.log('Category mapping found:', categoryMapping);
-    
-    if (!categoryMapping) {
-      console.log('No mapping found for category:', categoryName);
-      return [];
-    }
-    
-    const authorityNames = categoryMapping[subcategoryName];
-    console.log('Authority names for subcategory:', authorityNames);
-    
-    if (!authorityNames) {
-      console.log('No authority names found for subcategory:', subcategoryName);
-      return [];
-    }
-    
-    console.log('Returning authority names:', authorityNames);
-    return authorityNames;
-  };
-
-
-  // Filter authorities based on selected category and subcategory
+  // Filter authority types from selected subcategory (DB-driven)
   useEffect(() => {
-    if (selectedCategoryId && subcategories.length > 0) {
-      const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
-      const selectedSubcategoryId = watch('subcategoryId');
-      const selectedSubcategory = subcategories.find(sub => sub.id === selectedSubcategoryId);
-      
-      console.log('Filtering authorities:', {
-        selectedCategory: selectedCategory?.name,
-        selectedSubcategory: selectedSubcategory?.name,
-        categoryId: selectedCategoryId,
-        subcategoryId: selectedSubcategoryId
-      });
-      
-      if (selectedCategory && selectedSubcategory) {
-        const relevantAuthorityTypes = getRelevantAuthorities(
-          getLocalizedName(selectedCategory), 
-          getLocalizedName(selectedSubcategory)
-        );
-        
-        console.log('Relevant authority types:', relevantAuthorityTypes);
-        
-        setFilteredAuthorities(relevantAuthorityTypes);
-      } else {
-        setFilteredAuthorities([]);
-      }
-    } else {
+    if (!selectedCategoryId || subcategories.length === 0) {
       setFilteredAuthorities([]);
+      return;
     }
-  }, [selectedCategoryId, subcategories, watch('subcategoryId'), categories]);
+    const subId = watch('subcategoryId');
+    const sc = subcategories.find(s => s.id === subId);
+    setFilteredAuthorities(Array.isArray(sc?.authorityTypes) ? sc.authorityTypes : []);
+  }, [selectedCategoryId, subcategories, watch('subcategoryId')]);
+
+  // Note: We intentionally do not fetch mapped authorities here.
+  // Step 4 collects names for the selected authority levels (authorityTypes) only.
 
   // Create issue mutation
   const createIssueMutation = useMutation(
@@ -255,7 +136,7 @@ const ReportIssueMultiStep = () => {
     }
   );
 
-  const handleLocationSelect = (location) => {
+  const handleLocationSelect = async (location) => {
     console.log('handleLocationSelect called with:', location);
     console.log('Previous selectedLocation:', selectedLocation);
     console.log('Setting selectedLocation to:', location);
@@ -284,6 +165,64 @@ const ReportIssueMultiStep = () => {
       console.log('Pincode:', location.pincode);
     }
     console.log('Coordinates:', location.lat, location.lng);
+
+    // Fetch constituency data if we have valid coordinates
+    if (location.lat && location.lng) {
+      try {
+        setIsFetchingConstituency(true);
+        console.log('Fetching constituency data for:', location.lat, location.lng);
+        
+        const constituencyData = await constituencyAPI.findConstituencies(location.lat, location.lng);
+        console.log('Constituency data received:', constituencyData);
+        
+        // Extract MLA info
+        if (constituencyData.assembly_constituencies && constituencyData.assembly_constituencies.length > 0) {
+          const mla = constituencyData.assembly_constituencies[0];
+          const mlaData = {
+            name: mla.representative?.name || '',
+            party: mla.representative?.party || '',
+            constituency: mla.name || '',
+            state: mla.state || '',
+            role: mla.representative?.role || 'mla'
+          };
+          setMlaInfo(mlaData);
+          console.log('MLA info set:', mlaData);
+        } else {
+          setMlaInfo(null);
+          console.log('No MLA data found');
+        }
+        
+        // Extract MP info
+        if (constituencyData.parliament_constituencies && constituencyData.parliament_constituencies.length > 0) {
+          const mp = constituencyData.parliament_constituencies[0];
+          const mpData = {
+            name: mp.representative?.name || '',
+            party: mp.representative?.party || '',
+            constituency: mp.name || '',
+            state: mp.state || '',
+            role: mp.representative?.role || 'mp'
+          };
+          setMpInfo(mpData);
+          console.log('MP info set:', mpData);
+        } else {
+          setMpInfo(null);
+          console.log('No MP data found');
+        }
+        
+        toast.success('Constituency data fetched successfully!');
+      } catch (error) {
+        console.error('Error fetching constituency data:', error);
+        setMlaInfo(null);
+        setMpInfo(null);
+        toast.error('Failed to fetch constituency data. You can still proceed.');
+      } finally {
+        setIsFetchingConstituency(false);
+      }
+    } else {
+      // Clear MLA/MP data if no valid coordinates
+      setMlaInfo(null);
+      setMpInfo(null);
+    }
   };
 
   const handleFileUpload = (event) => {
@@ -328,7 +267,9 @@ const ReportIssueMultiStep = () => {
       ...data,
       location: selectedLocation,
       media: selectedFiles.map(file => file.dataUrl),
-      authorityInfo: authorityInfo
+      authorityInfo: authorityInfo,
+      mlaInfo: mlaInfo,
+      mpInfo: mpInfo
     };
 
     
@@ -395,7 +336,7 @@ const ReportIssueMultiStep = () => {
                 disabled={categoriesLoading}
               >
                 <option value="">Select a category</option>
-                {categories?.map((category) => (
+                {categoriesList.map((category) => (
                   <option key={category.id} value={category.id}>
                     {getLocalizedName(category)}
                   </option>
@@ -613,13 +554,47 @@ const ReportIssueMultiStep = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      // Add pincode functionality here
-                      toast.info('Pincode functionality coming soon!');
+                    onClick={async () => {
+                      if (pincode.length !== 6) {
+                        toast.error('Please enter a valid 6-digit pincode');
+                        return;
+                      }
+                      try {
+                        setIsFetchingPincode(true);
+                        // Use OpenStreetMap Nominatim to geocode the pincode in India
+                        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(pincode + ' India')}&limit=1`;
+                        const res = await fetch(url, {
+                          headers: {
+                            'Accept': 'application/json'
+                          }
+                        });
+                        if (!res.ok) {
+                          throw new Error('Geocoding failed');
+                        }
+                        const data = await res.json();
+                        if (!Array.isArray(data) || data.length === 0) {
+                          toast.error('Could not find location for this pincode');
+                          return;
+                        }
+                        const hit = data[0];
+                        const lat = parseFloat(hit.lat);
+                        const lng = parseFloat(hit.lon);
+                        const address = hit.display_name || `Pincode ${pincode}, India`;
+                        const location = { lat, lng, address, pincode };
+                        handleLocationSelect(location);
+                        setLocationInput(address);
+                        toast.success('Location set from pincode');
+                      } catch (err) {
+                        console.error('Pincode lookup error:', err);
+                        toast.error('Failed to fetch location for pincode');
+                      } finally {
+                        setIsFetchingPincode(false);
+                      }
                     }}
-                    className="btn btn-primary"
+                    disabled={isFetchingPincode}
+                    className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Find Location
+                    {isFetchingPincode ? 'Finding...' : 'Find Location'}
                   </button>
                 </div>
               </div>
@@ -683,12 +658,183 @@ const ReportIssueMultiStep = () => {
               </div>
             </div>
 
+            {/* MLA and MP Information - Always shown if location is selected */}
+            {selectedLocation && (
+              <div className="space-y-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                    <h4 className="text-lg font-medium text-green-800">Constituency Representatives</h4>
+                  </div>
+                  <p className="text-sm text-green-700 mb-4">
+                    Based on your selected location, here are the elected representatives for this area:
+                  </p>
+                  
+                  {/* MLA Information */}
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border border-green-100">
+                      <h5 className="font-medium text-gray-900 mb-3 flex items-center">
+                        <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold mr-2">MLA</span>
+                        Member of Legislative Assembly
+                      </h5>
+                      {isFetchingConstituency ? (
+                        <div className="flex items-center text-gray-500">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                          Fetching MLA information...
+                        </div>
+                      ) : mlaInfo ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                              <input
+                                type="text"
+                                value={mlaInfo.name}
+                                onChange={(e) => setMlaInfo({...mlaInfo, name: e.target.value})}
+                                className="w-full input"
+                                placeholder="MLA Name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Party</label>
+                              <input
+                                type="text"
+                                value={mlaInfo.party}
+                                onChange={(e) => setMlaInfo({...mlaInfo, party: e.target.value})}
+                                className="w-full input"
+                                placeholder="Political Party"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Constituency</label>
+                              <input
+                                type="text"
+                                value={mlaInfo.constituency}
+                                onChange={(e) => setMlaInfo({...mlaInfo, constituency: e.target.value})}
+                                className="w-full input"
+                                placeholder="Assembly Constituency"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                              <input
+                                type="text"
+                                value={mlaInfo.state}
+                                onChange={(e) => setMlaInfo({...mlaInfo, state: e.target.value})}
+                                className="w-full input"
+                                placeholder="State"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 text-sm">
+                          No MLA information available for this location. You can enter details manually:
+                          <div className="mt-3 space-y-2">
+                            <input
+                              type="text"
+                              placeholder="MLA Name"
+                              className="w-full input"
+                              onChange={(e) => setMlaInfo({...mlaInfo, name: e.target.value})}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Political Party"
+                              className="w-full input"
+                              onChange={(e) => setMlaInfo({...mlaInfo, party: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* MP Information */}
+                    <div className="bg-white rounded-lg p-4 border border-green-100">
+                      <h5 className="font-medium text-gray-900 mb-3 flex items-center">
+                        <span className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold mr-2">MP</span>
+                        Member of Parliament
+                      </h5>
+                      {isFetchingConstituency ? (
+                        <div className="flex items-center text-gray-500">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600 mr-2"></div>
+                          Fetching MP information...
+                        </div>
+                      ) : mpInfo ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                              <input
+                                type="text"
+                                value={mpInfo.name}
+                                onChange={(e) => setMpInfo({...mpInfo, name: e.target.value})}
+                                className="w-full input"
+                                placeholder="MP Name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Party</label>
+                              <input
+                                type="text"
+                                value={mpInfo.party}
+                                onChange={(e) => setMpInfo({...mpInfo, party: e.target.value})}
+                                className="w-full input"
+                                placeholder="Political Party"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Constituency</label>
+                              <input
+                                type="text"
+                                value={mpInfo.constituency}
+                                onChange={(e) => setMpInfo({...mpInfo, constituency: e.target.value})}
+                                className="w-full input"
+                                placeholder="Parliament Constituency"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                              <input
+                                type="text"
+                                value={mpInfo.state}
+                                onChange={(e) => setMpInfo({...mpInfo, state: e.target.value})}
+                                className="w-full input"
+                                placeholder="State"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 text-sm">
+                          No MP information available for this location. You can enter details manually:
+                          <div className="mt-3 space-y-2">
+                            <input
+                              type="text"
+                              placeholder="MP Name"
+                              className="w-full input"
+                              onChange={(e) => setMpInfo({...mpInfo, name: e.target.value})}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Political Party"
+                              className="w-full input"
+                              onChange={(e) => setMpInfo({...mpInfo, party: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Dynamic Authority Input Fields */}
             {filteredAuthorities.length > 0 ? (
               <div className="space-y-4">
-                <h4 className="text-lg font-medium text-gray-900">Relevant Authorities</h4>
+                <h4 className="text-lg font-medium text-gray-900">Other Relevant Authorities</h4>
                 <p className="text-sm text-gray-600">
-                  Based on your selected category and subcategory, please provide the names of the relevant authorities:
+                  Based on your selected category and subcategory, please provide the names of other relevant authorities:
                 </p>
                 <div className="space-y-4">
                   {filteredAuthorities.map((authorityType, index) => (
@@ -714,6 +860,8 @@ const ReportIssueMultiStep = () => {
                 </p>
               </div>
             )}
+
+            {/* We only show inputs for authority levels to capture person names. */}
 
             {/* Note */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -754,8 +902,8 @@ const ReportIssueMultiStep = () => {
               <div>
                 <h4 className="font-medium text-gray-900">Category:</h4>
                 <p className="text-gray-700">
-                  {categories?.find(cat => cat.id === watch('categoryId')) ? 
-                    getLocalizedName(categories.find(cat => cat.id === watch('categoryId'))) : 
+                  {categoriesList.find(cat => cat.id === watch('categoryId')) ? 
+                    getLocalizedName(categoriesList.find(cat => cat.id === watch('categoryId'))) : 
                     'Not selected'}
                 </p>
               </div>
@@ -769,8 +917,58 @@ const ReportIssueMultiStep = () => {
                   {selectedLocation?.address || 'Not selected'}
                 </p>
               </div>
+              {/* MLA Information */}
+              {mlaInfo && (
+                <div>
+                  <h4 className="font-medium text-gray-900">MLA Information:</h4>
+                  <div className="text-gray-700 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Name:</span>
+                      <span>{mlaInfo.name || 'Not provided'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Party:</span>
+                      <span>{mlaInfo.party || 'Not provided'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Constituency:</span>
+                      <span>{mlaInfo.constituency || 'Not provided'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">State:</span>
+                      <span>{mlaInfo.state || 'Not provided'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MP Information */}
+              {mpInfo && (
+                <div>
+                  <h4 className="font-medium text-gray-900">MP Information:</h4>
+                  <div className="text-gray-700 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Name:</span>
+                      <span>{mpInfo.name || 'Not provided'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Party:</span>
+                      <span>{mpInfo.party || 'Not provided'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Constituency:</span>
+                      <span>{mpInfo.constituency || 'Not provided'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">State:</span>
+                      <span>{mpInfo.state || 'Not provided'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <h4 className="font-medium text-gray-900">Authority Information:</h4>
+                <h4 className="font-medium text-gray-900">Other Authority Information:</h4>
                 <div className="text-gray-700">
                   {filteredAuthorities.length > 0 ? (
                     <div className="space-y-2">
@@ -786,7 +984,7 @@ const ReportIssueMultiStep = () => {
                       })}
                     </div>
                   ) : (
-                    <p>No authorities specified for this category/subcategory</p>
+                    <p>No other authorities specified for this category/subcategory</p>
                   )}
                 </div>
               </div>

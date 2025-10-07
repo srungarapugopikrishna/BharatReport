@@ -1,44 +1,24 @@
 import React from 'react';
-import { useQuery } from 'react-query';
-import { Edit, Trash2, Eye, User, Mail, Phone } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { Eye, User, Mail, Phone, Ban, RotateCcw } from 'lucide-react';
+import { adminAPI } from '../../services/api';
 
 const UsersManagement = () => {
-  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  // In a real app, you would fetch users from an API
-  const mockUsers = [
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      phone: '+91-9876543210',
-      role: 'citizen',
-      isActive: true,
-      createdAt: '2024-01-15',
-      lastLogin: '2024-01-20'
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      phone: '+91-9876543211',
-      role: 'citizen',
-      isActive: true,
-      createdAt: '2024-01-10',
-      lastLogin: '2024-01-19'
-    },
-    {
-      id: '3',
-      name: 'Admin User',
-      email: 'admin@janatareport.com',
-      phone: '+91-9876543212',
-      role: 'admin',
-      isActive: true,
-      createdAt: '2024-01-01',
-      lastLogin: '2024-01-20'
-    }
-  ];
+  const { data: users, isLoading } = useQuery(
+    'admin-users',
+    () => adminAPI.listUsers().then(r => r.data.users || r.data)
+  );
+
+  const banMutation = useMutation(
+    (id) => adminAPI.banUser(id),
+    { onSuccess: () => queryClient.invalidateQueries('admin-users') }
+  );
+  const unbanMutation = useMutation(
+    (id) => adminAPI.unbanUser(id),
+    { onSuccess: () => queryClient.invalidateQueries('admin-users') }
+  );
 
   return (
     <div className="space-y-6">
@@ -77,8 +57,10 @@ const UsersManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {mockUsers.map((userData) => (
-                <tr key={userData.id}>
+              {isLoading ? (
+                <tr><td className="p-6 text-sm text-gray-500">Loading...</td></tr>
+              ) : (users || []).map((u) => (
+                <tr key={u.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
@@ -88,64 +70,65 @@ const UsersManagement = () => {
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {userData.name}
+                          {u.name || '(no name)'}
                         </div>
                         <div className="text-sm text-gray-500">
-                          ID: {userData.id}
+                          ID: {u.id}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div>
-                      {userData.email && (
+                      {u.email && (
                         <div className="flex items-center text-xs text-gray-500 mb-1">
                           <Mail className="w-3 h-3 mr-1" />
-                          {userData.email}
+                          {u.email}
                         </div>
                       )}
-                      {userData.phone && (
+                      {u.phone && (
                         <div className="flex items-center text-xs text-gray-500">
                           <Phone className="w-3 h-3 mr-1" />
-                          {userData.phone}
+                          {u.phone}
                         </div>
                       )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      userData.role === 'admin' ? 'bg-red-100 text-red-800' :
-                      userData.role === 'official' ? 'bg-blue-100 text-blue-800' :
+                      u.role === 'admin' ? 'bg-red-100 text-red-800' :
+                      u.role === 'official' ? 'bg-blue-100 text-blue-800' :
                       'bg-green-100 text-green-800'
                     }`}>
-                      {userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}
+                      {u.role?.charAt(0).toUpperCase() + u.role?.slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      userData.isActive 
+                      u.isActive 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {userData.isActive ? 'Active' : 'Inactive'}
+                      {u.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(userData.lastLogin).toLocaleDateString()}
+                    {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      <button className="text-primary-600 hover:text-primary-900">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="text-primary-600 hover:text-primary-900">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      {userData.id !== user?.id && (
-                        <button className="text-red-600 hover:text-red-900">
-                          <Trash2 className="w-4 h-4" />
+                      {u.isBanned ? (
+                        <button className="btn btn-secondary px-2 py-1" onClick={() => unbanMutation.mutate(u.id)} disabled={unbanMutation.isLoading}>
+                          <RotateCcw className="w-4 h-4" /> Unban
+                        </button>
+                      ) : (
+                        <button className="btn btn-secondary px-2 py-1" onClick={() => banMutation.mutate(u.id)} disabled={banMutation.isLoading}>
+                          <Ban className="w-4 h-4" /> Ban
                         </button>
                       )}
+                      <a className="text-primary-600 hover:text-primary-900" href={`mailto:${u.email}`}>
+                        <Eye className="w-4 h-4" />
+                      </a>
                     </div>
                   </td>
                 </tr>

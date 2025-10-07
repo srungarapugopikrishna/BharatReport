@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: janata-backend
+    env: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 5000
+      # Use either a single DATABASE_URL or discrete vars below
+      # - key: DATABASE_URL
+      #   sync: false
+      # - key: DB_HOST
+      #   sync: false
+      # - key: DB_PORT
+      #   value: 5432
+      # - key: DB_NAME
+      #   value: janata_report
+      # - key: DB_USER
+      #   sync: false
+      # - key: DB_PASSWORD
+      #   sync: false

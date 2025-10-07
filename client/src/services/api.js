@@ -129,7 +129,7 @@ export const adminAPI = {
 // Constituency API
 export const constituencyAPI = {
   findConstituencies: (lat, lng) => {
-    const url = `http://localhost:8000/api/find-constituencies/?format=json&lat=${lat}&lng=${lng}`;
+    const url = `https://know-your-leader.onrender.com//api/find-constituencies/?format=json&lat=${lat}&lng=${lng}`;
     return fetch(url, {
       method: 'GET',
       headers: {

@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "A comprehensive civic issue reporting and tracking platform for India",
   "main": "server/index.js",
+  "engines": {
+    "node": "20.x",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm run dev",

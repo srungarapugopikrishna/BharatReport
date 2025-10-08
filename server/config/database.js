@@ -38,16 +38,5 @@ const sequelize = hasDatabaseUrl
       }
     );
 
-// Debug logging
-console.log('Database connection config:', {
-  hasDatabaseUrl,
-  databaseUrl: process.env.DATABASE_URL ? 'SET' : 'NOT SET',
-  dbHost: process.env.DB_HOST,
-  dbPort: process.env.DB_PORT,
-  dbName: process.env.DB_NAME,
-  dbUser: process.env.DB_USER,
-  dbPassword: process.env.DB_PASSWORD ? 'SET' : 'NOT SET',
-  dbSsl: process.env.DB_SSL
-});
 
 module.exports = sequelize;

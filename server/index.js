@@ -58,6 +58,24 @@ if (process.env.NODE_ENV === 'development') {
 // NOTE: CSRF disabled for now (misconfigured without session/cookies).
 // Re-enable after we add cookie/session and client token handling.
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'JanataReport API Server',
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      issues: '/api/issues',
+      categories: '/api/categories',
+      authorities: '/api/authorities',
+      admin: '/api/admin'
+    }
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 

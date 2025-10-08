@@ -22,7 +22,5 @@ services:
         value: postgres_admin
       - key: DB_PASSWORD
         value: Wdlcl1JxA9hQI4rxWYbd7E9wiwJXAIuq
-      - key: DATABASE_URL
-        value: postgresql://postgres_admin:Wdlcl1JxA9hQI4rxWYbd7E9wiwJXAIuq@dpg-d3ikkkk9c44c73aslfmg-a.oregon-postgres.render.com/janata_report
       - key: DB_SSL
         value: "true"

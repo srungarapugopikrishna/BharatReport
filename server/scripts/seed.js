@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { sequelize, Category, Subcategory } = require('../models');
+const { sequelize, Category, Subcategory, Official, User, Authority } = require('../models');
+const { syncDatabase } = require('../models');
 
 const mapping = {
   "Roads & Transport": {
@@ -74,208 +75,6 @@ const mapping = {
     "Public Encroachments": ["Town Planning Department", "Corporator"]
   }
 };
-
-async function seed() {
-  try {
-    await sequelize.authenticate();
-    console.log('DB connected. Seeding categories/subcategories...');
-
-    for (const [categoryName, subcats] of Object.entries(mapping)) {
-      const [category] = await Category.findOrCreate({
-        where: { name: categoryName },
-        defaults: { name: categoryName }
-      });
-
-      for (const subName of Object.keys(subcats)) {
-        await Subcategory.findOrCreate({
-          where: { name: subName, categoryId: category.id },
-          defaults: { name: subName, categoryId: category.id }
-        });
-      }
-    }
-
-    console.log('Seeding complete.');
-    process.exit(0);
-  } catch (err) {
-    console.error('Seeding failed:', err);
-    process.exit(1);
-  }
-}
-
-seed();
-
-const { Category, Subcategory, Official, User } = require('../models');
-const { syncDatabase } = require('../models');
-
-const categoriesData = [
-  {
-    name: 'Roads & Transport',
-    nameHindi: 'सड़कें और परिवहन',
-    nameTelugu: 'రోడ్లు మరియు రవాణా',
-    description: 'Issues related to roads, footpaths, streetlights, and transportation',
-    icon: 'road',
-    color: '#3B82F6',
-    subcategories: [
-      { name: 'Potholes', nameHindi: 'खड्डे', nameTelugu: 'గుంతలు' },
-      { name: 'Broken Footpaths', nameHindi: 'टूटे फुटपाथ', nameTelugu: 'విరిగిన ఫుట్‌పాత్‌లు' },
-      { name: 'Streetlights not working', nameHindi: 'स्ट्रीटलाइट काम नहीं कर रही', nameTelugu: 'వీధి దీపాలు పనిచేయడం లేదు' },
-      { name: 'Encroachment', nameHindi: 'अतिक्रमण', nameTelugu: 'అతిక్రమణ' },
-      { name: 'Illegal Parking', nameHindi: 'अवैध पार्किंग', nameTelugu: 'చట్టవిరుద్ధ పార్కింగ్' },
-      { name: 'Missing Signboards', nameHindi: 'गायब साइनबोर्ड', nameTelugu: 'కనిపించని సైన్‌బోర్డ్‌లు' },
-      { name: 'Wrong Speed Breakers', nameHindi: 'गलत स्पीड ब्रेकर', nameTelugu: 'తప్పు స్పీడ్ బ్రేకర్‌లు' }
-    ]
-  },
-  {
-    name: 'Traffic & Safety',
-    nameHindi: 'यातायात और सुरक्षा',
-    nameTelugu: 'ట్రాఫిక్ మరియు భద్రత',
-    description: 'Traffic signals, intersections, and safety issues',
-    icon: 'traffic-light',
-    color: '#EF4444',
-    subcategories: [
-      { name: 'Traffic Signal Not Working', nameHindi: 'ट्रैफिक सिग्नल काम नहीं कर रहा', nameTelugu: 'ట్రాఫిక్ సిగ్నల్ పనిచేయడం లేదు' },
-      { name: 'Dangerous Intersections', nameHindi: 'खतरनाक चौराहे', nameTelugu: 'ప్రమాదకరమైన క్రాస్‌రోడ్‌లు' },
-      { name: 'Missing Pedestrian Crossings', nameHindi: 'गायब पैदल चलने वालों के लिए क्रॉसिंग', nameTelugu: 'కనిపించని పాదచారుల క్రాసింగ్‌లు' },
-      { name: 'Illegal Auto/Taxi Stands', nameHindi: 'अवैध ऑटो/टैक्सी स्टैंड', nameTelugu: 'చట్టవిరుద్ధ ఆటో/టాక్సీ స్టాండ్‌లు' }
-    ]
-  },
-  {
-    name: 'Water Supply & Drainage',
-    nameHindi: 'जल आपूर्ति और निकासी',
-    nameTelugu: 'నీటి సరఫరా మరియు డ్రైనేజ్',
-    description: 'Water supply, drainage, and sewage issues',
-    icon: 'droplet',
-    color: '#06B6D4',
-    subcategories: [
-      { name: 'No Water Supply', nameHindi: 'पानी की आपूर्ति नहीं', nameTelugu: 'నీటి సరఫరా లేదు' },
-      { name: 'Leakage', nameHindi: 'रिसाव', nameTelugu: 'లీకేజ్' },
-      { name: 'Contaminated Water', nameHindi: 'दूषित पानी', nameTelugu: 'కలుషిత నీరు' },
-      { name: 'Open Drains', nameHindi: 'खुले नाले', nameTelugu: 'తెరిచిన డ్రైన్‌లు' },
-      { name: 'Blocked Sewage', nameHindi: 'अवरुद्ध सीवेज', nameTelugu: 'అడ్డుకున్న సీవేజ్' }
-    ]
-  },
-  {
-    name: 'Electricity & Power',
-    nameHindi: 'बिजली और बिजली',
-    nameTelugu: 'విద్యుత్ మరియు శక్తి',
-    description: 'Power cuts, electrical safety, and transformer issues',
-    icon: 'zap',
-    color: '#F59E0B',
-    subcategories: [
-      { name: 'Power Cuts', nameHindi: 'बिजली कटौती', nameTelugu: 'విద్యుత్ కట్‌లు' },
-      { name: 'Unsafe Electrical Poles/Wires', nameHindi: 'असुरक्षित बिजली के खंभे/तार', nameTelugu: 'అసురక్షిత విద్యుత్ స్తంభాలు/వైర్‌లు' },
-      { name: 'Faulty Transformers', nameHindi: 'खराब ट्रांसफार्मर', nameTelugu: 'తప్పుడు ట్రాన్స్‌ఫార్మర్‌లు' },
-      { name: 'No Streetlights', nameHindi: 'कोई स्ट्रीटलाइट नहीं', nameTelugu: 'వీధి దీపాలు లేవు' }
-    ]
-  },
-  {
-    name: 'Sanitation & Waste',
-    nameHindi: 'सफाई और कचरा',
-    nameTelugu: 'సానిటేషన్ మరియు వేస్ట్',
-    description: 'Garbage collection, waste management, and sanitation',
-    icon: 'trash-2',
-    color: '#10B981',
-    subcategories: [
-      { name: 'Garbage Not Collected', nameHindi: 'कचरा एकत्र नहीं किया गया', nameTelugu: 'చెత్త సేకరించబడలేదు' },
-      { name: 'Overflowing Bins', nameHindi: 'अतिप्रवाह बिन', nameTelugu: 'ఓవర్‌ఫ్లో బిన్‌లు' },
-      { name: 'Open Dumping', nameHindi: 'खुला डंपिंग', nameTelugu: 'తెరిచిన డంపింగ్' },
-      { name: 'Public Toilet Maintenance', nameHindi: 'सार्वजनिक शौचालय रखरखाव', nameTelugu: 'ప్రజా శౌచాలయ నిర్వహణ' }
-    ]
-  },
-  {
-    name: 'Environment',
-    nameHindi: 'पर्यावरण',
-    nameTelugu: 'పర్యావరణం',
-    description: 'Environmental issues and pollution',
-    icon: 'leaf',
-    color: '#22C55E',
-    subcategories: [
-      { name: 'Tree Cutting', nameHindi: 'पेड़ काटना', nameTelugu: 'చెట్లు కత్తిరించడం' },
-      { name: 'Air Pollution', nameHindi: 'वायु प्रदूषण', nameTelugu: 'వాయు కాలుష్యం' },
-      { name: 'Water Pollution', nameHindi: 'जल प्रदूषण', nameTelugu: 'నీటి కాలుష్యం' },
-      { name: 'Illegal Construction Near Lakes', nameHindi: 'झीलों के पास अवैध निर्माण', nameTelugu: 'సరస్సుల దగ్గర చట్టవిరుద్ధ నిర్మాణం' }
-    ]
-  },
-  {
-    name: 'Health & Safety',
-    nameHindi: 'स्वास्थ्य और सुरक्षा',
-    nameTelugu: 'ఆరోగ్యం మరియు భద్రత',
-    description: 'Health facilities, safety concerns, and medical issues',
-    icon: 'heart',
-    color: '#EC4899',
-    subcategories: [
-      { name: 'Dengue Breeding Spots', nameHindi: 'डेंगू प्रजनन स्थल', nameTelugu: 'డెంగ్యూ ప్రజనన ప్రదేశాలు' },
-      { name: 'Lack of Fogging', nameHindi: 'फॉगिंग की कमी', nameTelugu: 'ఫాగింగ్ లేకపోవడం' },
-      { name: 'Lack of Ambulances', nameHindi: 'एम्बुलेंस की कमी', nameTelugu: 'అంబులెన్స్ లేకపోవడం' },
-      { name: 'Hospital Negligence', nameHindi: 'अस्पताल की लापरवाही', nameTelugu: 'ఆసుపత్రి నిర్లక్ష్యం' }
-    ]
-  },
-  {
-    name: 'Law & Order',
-    nameHindi: 'कानून और व्यवस्था',
-    nameTelugu: 'చట్టం మరియు క్రమం',
-    description: 'Security, law enforcement, and public safety',
-    icon: 'shield',
-    color: '#8B5CF6',
-    subcategories: [
-      { name: 'Eve-teasing Hotspots', nameHindi: 'छेड़छाड़ हॉटस्पॉट', nameTelugu: 'ఈవ్ టీజింగ్ హాట్‌స్పాట్‌లు' },
-      { name: 'Illegal Alcohol Outlets', nameHindi: 'अवैध शराब आउटलेट', nameTelugu: 'చట్టవిరుద్ధ మద్య అవుట్‌లెట్‌లు' },
-      { name: 'Public Nuisance', nameHindi: 'सार्वजनिक उपद्रव', nameTelugu: 'ప్రజా ఉపద్రవం' }
-    ]
-  },
-  {
-    name: 'Education',
-    nameHindi: 'शिक्षा',
-    nameTelugu: 'విద్య',
-    description: 'Educational facilities and infrastructure',
-    icon: 'book-open',
-    color: '#6366F1',
-    subcategories: [
-      { name: 'Broken Infrastructure in Government Schools', nameHindi: 'सरकारी स्कूलों में टूटा बुनियादी ढांचा', nameTelugu: 'ప్రభుత్వ పాఠశాలలలో విరిగిన మౌలిక సదుపాయాలు' },
-      { name: 'Lack of Teachers', nameHindi: 'शिक्षकों की कमी', nameTelugu: 'ఉపాధ్యాయుల లేకపోవడం' }
-    ]
-  },
-  {
-    name: 'Public Transport',
-    nameHindi: 'सार्वजनिक परिवहन',
-    nameTelugu: 'ప్రజా రవాణా',
-    description: 'Public transportation and related infrastructure',
-    icon: 'bus',
-    color: '#F97316',
-    subcategories: [
-      { name: 'Poor Bus Frequency', nameHindi: 'खराब बस आवृत्ति', nameTelugu: 'చెడు బస్ ఫ్రీక్వెన్సీ' },
-      { name: 'Damaged Bus Shelters', nameHindi: 'क्षतिग्रस्त बस शेल्टर', nameTelugu: 'పాడైన బస్ షెల్టర్‌లు' },
-      { name: 'Unsafe Metro Stations', nameHindi: 'असुरक्षित मेट्रो स्टेशन', nameTelugu: 'అసురక్షిత మెట్రో స్టేషన్‌లు' }
-    ]
-  },
-  {
-    name: 'Welfare & Governance',
-    nameHindi: 'कल्याण और शासन',
-    nameTelugu: 'సంక్షేమం మరియు పరిపాలన',
-    description: 'Government services, welfare schemes, and governance',
-    icon: 'users',
-    color: '#84CC16',
-    subcategories: [
-      { name: 'Pension Delays', nameHindi: 'पेंशन में देरी', nameTelugu: 'పెన్షన్‌లో ఆలస్యం' },
-      { name: 'Ration Card Issues', nameHindi: 'राशन कार्ड समस्या', nameTelugu: 'రేషన్ కార్డ్ సమస్యలు' },
-      { name: 'Aadhaar Errors', nameHindi: 'आधार त्रुटियां', nameTelugu: 'ఆధార్ లోపాలు' },
-      { name: 'Corruption', nameHindi: 'भ्रष्टाचार', nameTelugu: 'అవినీతి' }
-    ]
-  },
-  {
-    name: 'Miscellaneous',
-    nameHindi: 'विविध',
-    nameTelugu: 'వివిధ',
-    description: 'Other issues not covered in specific categories',
-    icon: 'more-horizontal',
-    color: '#6B7280',
-    subcategories: [
-      { name: 'Stray Dogs/Cattle', nameHindi: 'आवारा कुत्ते/मवेशी', nameTelugu: 'ఆవారా కుక్కలు/పశువులు' },
-      { name: 'Fire Hazards', nameHindi: 'आग का खतरा', nameTelugu: 'అగ్ని ప్రమాదాలు' },
-      { name: 'Public Encroachments', nameHindi: 'सार्वजनिक अतिक्रमण', nameTelugu: 'ప్రజా అతిక్రమణలు' }
-    ]
-  }
-];
 
 const officialsData = [
   {
@@ -371,24 +170,57 @@ const seedDatabase = async () => {
     await Category.destroy({ where: {} });
     await Subcategory.destroy({ where: {} });
     await Official.destroy({ where: {} });
+    await Authority.destroy({ where: {} });
     
     console.log('Cleared existing data');
     
-    // Create categories and subcategories
-    for (const categoryData of categoriesData) {
-      const { subcategories, ...categoryInfo } = categoryData;
-      
-      const category = await Category.create(categoryInfo);
+    // Create authorities first
+    const authorityMap = new Map();
+    const allAuthorities = new Set();
+    
+    // Collect all unique authorities from mapping
+    for (const [categoryName, subcats] of Object.entries(mapping)) {
+      for (const [subName, authorities] of Object.entries(subcats)) {
+        authorities.forEach(auth => allAuthorities.add(auth));
+      }
+    }
+    
+    // Create authority records
+    for (const authorityName of allAuthorities) {
+      const [authority] = await Authority.findOrCreate({
+        where: { level: authorityName },
+        defaults: { level: authorityName, description: `${authorityName} authority` }
+      });
+      authorityMap.set(authorityName, authority);
+      console.log(`Created authority: ${authorityName}`);
+    }
+    
+    // Create categories and subcategories using mapping
+    for (const [categoryName, subcats] of Object.entries(mapping)) {
+      const [category] = await Category.findOrCreate({
+        where: { name: categoryName },
+        defaults: { 
+          name: categoryName,
+          description: `Issues related to ${categoryName.toLowerCase()}`,
+          icon: 'alert-circle',
+          color: '#3B82F6'
+        }
+      });
       console.log(`Created category: ${category.name}`);
       
       // Create subcategories for this category
-      for (const subcategoryData of subcategories) {
-        await Subcategory.create({
-          ...subcategoryData,
-          categoryId: category.id
+      for (const [subName, authorities] of Object.entries(subcats)) {
+        const [subcategory] = await Subcategory.findOrCreate({
+          where: { name: subName, categoryId: category.id },
+          defaults: { 
+            name: subName, 
+            categoryId: category.id,
+            description: `${subName} issues`,
+            authorityTypes: authorities
+          }
         });
+        console.log(`Created subcategory: ${subName} for ${category.name}`);
       }
-      console.log(`Created ${subcategories.length} subcategories for ${category.name}`);
     }
     
     // Get all categories to assign to officials
@@ -422,7 +254,7 @@ const seedDatabase = async () => {
   }
 };
 
-// Run seeding if this file is executed directly
+// Run seeding if this file is executed directly 
 if (require.main === module) {
   seedDatabase();
 }

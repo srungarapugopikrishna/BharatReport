@@ -68,11 +68,13 @@ export const LanguageProvider = ({ children }) => {
       
       // Status and Priority
       status: {
+        pending: 'Pending',
         open: 'Open',
         in_progress: 'In Progress',
         resolved: 'Resolved',
         verified: 'Verified',
-        closed: 'Closed'
+        closed: 'Closed',
+        rejected: 'Rejected'
       },
       
       priority: {
@@ -309,11 +311,13 @@ export const LanguageProvider = ({ children }) => {
       
       // Status and Priority
       status: {
+        pending: 'लंबित',
         open: 'खुला',
         in_progress: 'प्रगति में',
         resolved: 'हल',
         verified: 'सत्यापित',
-        closed: 'बंद'
+        closed: 'बंद',
+        rejected: 'अस्वीकृत'
       },
       
       priority: {
@@ -550,11 +554,13 @@ export const LanguageProvider = ({ children }) => {
       
       // Status and Priority
       status: {
+        pending: 'వేచి ఉన్న',
         open: 'తెరవబడింది',
         in_progress: 'ప్రగతిలో',
         resolved: 'పరిష్కరించబడింది',
         verified: 'ధృవీకరించబడింది',
-        closed: 'మూసివేయబడింది'
+        closed: 'మూసివేయబడింది',
+        rejected: 'తిరస్కరించబడింది'
       },
       
       priority: {

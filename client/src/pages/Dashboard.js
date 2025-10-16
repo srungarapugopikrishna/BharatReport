@@ -43,6 +43,8 @@ const Dashboard = () => {
 
   const getStatusIcon = (status) => {
     switch (status) {
+      case 'pending':
+        return <Clock className="w-4 h-4 text-orange-600" />;
       case 'open':
         return <AlertCircle className="w-4 h-4 text-yellow-600" />;
       case 'in_progress':
@@ -51,6 +53,10 @@ const Dashboard = () => {
         return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'verified':
         return <CheckCircle className="w-4 h-4 text-emerald-600" />;
+      case 'rejected':
+        return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case 'closed':
+        return <CheckCircle className="w-4 h-4 text-gray-600" />;
       default:
         return <AlertCircle className="w-4 h-4 text-gray-600" />;
     }

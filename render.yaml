@@ -33,7 +33,7 @@ services:
     buildCommand: |
       cd client
       npm install
-      CI=false npm run build
+      npx react-scripts build
     staticPublishPath: ./client/build
     plan: free
     envVars:

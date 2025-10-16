@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: janata-frontend
+    env: static
+    buildCommand: npm install && CI=false npm run build
+    staticPublishPath: ./build
+    plan: free
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://janata-backend.onrender.com/api
+      - key: REACT_APP_GOOGLE_MAPS_API_KEY
+        value: your_google_maps_api_key_here

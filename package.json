@@ -4,7 +4,7 @@
   "description": "A comprehensive civic issue reporting and tracking platform for India",
   "main": "server/index.js",
   "engines": {
-    "node": "20.x",
+    "node": ">=20.0.0",
     "npm": ">=8.0.0"
   },
   "scripts": {

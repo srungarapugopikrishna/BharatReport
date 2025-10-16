@@ -26,3 +26,15 @@ services:
         value: postgresql://postgres_admin:Wdlcl1JxA9hQI4rxWYbd7E9wiwJXAIuq@dpg-d3ikkkk9c44c73aslfmg-a.oregon-postgres.render.com/janata_report
       - key: DB_SSL
         value: "true"
+
+  - type: web
+    name: janata-frontend
+    env: static
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/build
+    plan: free
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://janata-backend.onrender.com/api
+      - key: REACT_APP_GOOGLE_MAPS_API_KEY
+        value: your_google_maps_api_key_here
